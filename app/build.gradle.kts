@@ -31,6 +31,7 @@ android {
     }
 
     defaultConfig {
+        // Distinct package ID allows registration alongside upstream in Yandex Dialogs.
         applicationId = "com.kzuev.airplay.duomax"
         minSdk = 24
         targetSdk = 36
