@@ -1,0 +1,62 @@
+name: Duo Max baseline debug APK
+
+on:
+  workflow_dispatch:
+  pull_request:
+    paths:
+      - "app/**"
+      - "gradle/**"
+      - "*.gradle.kts"
+      - "gradle.properties"
+      - ".gitmodules"
+      - ".github/workflows/duomax-baseline.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  debug-apk:
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    steps:
+      - name: Checkout with native dependencies
+        uses: actions/checkout@v4
+        with:
+          submodules: recursive
+          persist-credentials: false
+
+      - name: Java 21
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "21"
+          cache: gradle
+
+      - name: Android SDK and NDK
+        uses: android-actions/setup-android@v3
+
+      - name: Install pinned NDK and CMake
+        run: |
+          sdkmanager --install "ndk;27.0.12077973" "cmake;3.22.1"
+
+      - name: Build unsigned-for-release, debug-signed APK
+        run: |
+          chmod +x ./gradlew
+          ./gradlew --no-daemon :app:assembleDebug --stacktrace
+
+      - name: Record artifact checksums and build identity
+        run: |
+          mkdir -p artifacts
+          find app/build/outputs/apk/debug -maxdepth 1 -name '*.apk' -exec cp {} artifacts/ \;
+          (cd artifacts && sha256sum *.apk > SHA256SUMS)
+          git rev-parse HEAD > artifacts/SOURCE_COMMIT
+          git submodule status --recursive > artifacts/SUBMODULES
+          grep -E 'applicationId =|minSdk =|targetSdk =|versionCode =|versionName =|ndkVersion =' app/build.gradle.kts > artifacts/BUILD_PARAMETERS
+
+      - name: Upload APK and provenance
+        uses: actions/upload-artifact@v4
+        with:
+          name: duomax-debug-apk
+          path: artifacts/
+          if-no-files-found: error
+          retention-days: 30
