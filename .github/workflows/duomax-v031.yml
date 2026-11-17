@@ -22,12 +22,18 @@ jobs:
         uses: actions/checkout@v4
         with:
           submodules: recursive
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
           persist-credentials: false
 
       - name: Verify upstream v0.0.31 configuration
         shell: bash
         run: |
           set -euo pipefail
+          echo "Checked out commit: $(git rev-parse HEAD)"
+          echo "Version configuration:"
+          grep -E 'versionName|versionCode|compileSdk|targetSdk' app/build.gradle.kts
+          echo "Gradle wrapper:"
+          grep distributionUrl gradle/wrapper/gradle-wrapper.properties
           grep -q 'versionName = "0.0.31"' app/build.gradle.kts
           grep -q 'versionCode = 31' app/build.gradle.kts
           grep -q 'compileSdk = 36' app/build.gradle.kts
