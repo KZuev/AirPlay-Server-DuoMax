@@ -31,7 +31,7 @@ android {
     }
 
     defaultConfig {
-        applicationId = "io.github.jqssun.airplay"
+        applicationId = "com.kzuev.airplay.duomax"
         minSdk = 24
         targetSdk = 36
         versionCode = 31
