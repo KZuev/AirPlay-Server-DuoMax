@@ -2,14 +2,6 @@ name: Duo Max baseline debug APK
 
 on:
   workflow_dispatch:
-  pull_request:
-    paths:
-      - "app/**"
-      - "gradle/**"
-      - "*.gradle.kts"
-      - "gradle.properties"
-      - ".gitmodules"
-      - ".github/workflows/duomax-baseline.yml"
 
 permissions:
   contents: read
@@ -45,6 +37,17 @@ jobs:
           fi
           echo "Using $SDKMANAGER"
           yes | "$SDKMANAGER" --licenses >/dev/null || true
+          echo "Android SDK root: $SDK_ROOT"
+          echo "Installed SDK platforms:"
+          ls -1 "$SDK_ROOT/platforms" || true
+          echo "Available SDK platform 37 packages:"
+          "$SDKMANAGER" --sdk_root="$SDK_ROOT" --list | grep -E 'platforms;android-37([[:space:]]|$)' || true
+          if [ ! -f "$SDK_ROOT/platforms/android-37/android.jar" ]; then
+            if ! "$SDKMANAGER" --sdk_root="$SDK_ROOT" --list | grep -Eq '^[[:space:]]*platforms;android-37[[:space:]]*\\|'; then
+              echo "::error::compileSdk 37 is required by the current upstream 0.0.36 source, but platforms;android-37 is not available. Pin the genuine 0.0.31 sources before building; do not silently downgrade SDK."
+              exit 1
+            fi
+          fi
           "$SDKMANAGER" --sdk_root="$SDK_ROOT" --install "platforms;android-37" "ndk;27.0.12077973" "cmake;3.22.1"
 
       - name: Build unsigned-for-release, debug-signed APK
