@@ -32,12 +32,13 @@ jobs:
           java-version: "21"
           cache: gradle
 
-      - name: Android SDK and NDK
-        uses: android-actions/setup-android@v3
-
-      - name: Install pinned NDK and CMake
+      - name: Install Android SDK dependencies
         run: |
-          sdkmanager --install "ndk;27.0.12077973" "cmake;3.22.1"
+          # GitHub ubuntu-latest already provides Android command-line tools.
+          # Avoid setup-android@v3: its sdkmanager 'tools' request fails because
+          # the obsolete Android SDK 'tools' package is no longer available.
+          yes | sdkmanager --licenses >/dev/null || true
+          sdkmanager --install "platforms;android-37" "ndk;27.0.12077973" "cmake;3.22.1"
 
       - name: Build unsigned-for-release, debug-signed APK
         run: |
