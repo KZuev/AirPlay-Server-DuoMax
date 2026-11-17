@@ -33,7 +33,7 @@ jobs:
           grep -q 'compileSdk = 36' app/build.gradle.kts
           grep -q 'targetSdk = 36' app/build.gradle.kts
           grep -q 'agp = "8.9.2"' gradle/libs.versions.toml
-          grep -q 'gradle-8.11.1-bin.zip' gradle/wrapper/gradle-wrapper.properties
+          grep -Fq 'gradle-8.11.1-bin.zip' gradle/wrapper/gradle-wrapper.properties
           git submodule status --recursive | tee /tmp/submodule-status
           if grep -Eq '^[-+U]' /tmp/submodule-status; then
             echo "::error::Submodules are missing or not at pinned revisions"
