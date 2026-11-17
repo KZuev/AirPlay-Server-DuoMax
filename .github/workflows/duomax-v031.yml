@@ -83,6 +83,57 @@ jobs:
           git submodule status --recursive > artifacts/SUBMODULES
           grep -E 'applicationId =|minSdk =|targetSdk =|versionCode =|versionName =|ndkVersion =' app/build.gradle.kts > artifacts/BUILD_PARAMETERS
 
+      - name: Compare upstream release APK with our built APK
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p artifacts/apk-comparison
+          ORIGINAL="artifacts/apk-comparison/upstream-v0.0.31.apk"
+          curl --fail --location --retry 3 --output "$ORIGINAL" "https://github.com/jqssun/android-airplay-server/releases/download/v0.0.31/app-release.apk"
+          OUR_APK="$(find app/build/outputs/apk/debug -maxdepth 1 -name '*.apk' -print -quit)"
+          test -n "$OUR_APK"
+          SDK_ROOT="${ANDROID_HOME:-${ANDROID_SDK_ROOT:-/usr/local/lib/android/sdk}}"
+          BUILD_TOOLS="$(find "$SDK_ROOT/build-tools" -mindepth 1 -maxdepth 1 -type d | sort -V | tail -1)"
+          AAPT="$BUILD_TOOLS/aapt"
+          APKSIGNER="$BUILD_TOOLS/apksigner"
+          test -x "$AAPT" && test -x "$APKSIGNER"
+          for entry in "upstream:$ORIGINAL" "duomax:$OUR_APK"; do
+            name="${entry%%:*}"
+            apk="${entry#*:}"
+            out="artifacts/apk-comparison/$name"
+            "$AAPT" dump badging "$apk" > "$out-badging.txt"
+            "$AAPT" dump permissions "$apk" > "$out-permissions.txt"
+            "$AAPT" dump xmltree "$apk" AndroidManifest.xml > "$out-manifest.txt"
+            "$APKSIGNER" verify --print-certs "$apk" > "$out-signature.txt"
+            unzip -Z1 "$apk" | sort > "$out-files.txt"
+            sha256sum "$apk" > "$out-sha256.txt"
+          done
+          diff -u artifacts/apk-comparison/upstream-permissions.txt artifacts/apk-comparison/duomax-permissions.txt > artifacts/apk-comparison/permissions.diff || true
+          diff -u artifacts/apk-comparison/upstream-files.txt artifacts/apk-comparison/duomax-files.txt > artifacts/apk-comparison/files.diff || true
+          {
+            echo "# AirPlay Server v0.0.31: upstream vs Duo Max"
+            echo
+            echo "Original APK: upstream v0.0.31 GitHub release"
+            echo "Duo Max APK: current GitHub Actions debug build"
+            echo
+            echo "## Package identifiers"
+            grep '^package:' artifacts/apk-comparison/*-badging.txt || true
+            echo
+            echo "## Signatures"
+            grep -E 'Signer #1 certificate SHA-256 digest:' artifacts/apk-comparison/*-signature.txt || true
+            echo
+            echo "## Forbidden permissions"
+            if grep -E 'android.permission.(INSTALL_PACKAGES|REQUEST_INSTALL_PACKAGES|REQUEST_DELETE_PACKAGES|UPDATE_PACKAGES_WITHOUT_USER_ACTION|ENFORCE_UPDATE_OWNERSHIP|BIND_DEVICE_ADMIN)' artifacts/apk-comparison/*-permissions.txt; then
+              echo "Forbidden permission found: inspect output above"
+            else
+              echo "None of the six forbidden permissions found in either APK"
+            fi
+            echo
+            echo "## Permission differences"
+            cat artifacts/apk-comparison/permissions.diff
+          } | tee artifacts/apk-comparison/SUMMARY.md
+          rm "$ORIGINAL"
+
       - name: Upload APK and build provenance
         uses: actions/upload-artifact@v4
         with:
